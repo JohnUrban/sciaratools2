@@ -1,0 +1,1 @@
+../seqtools/fasta2falcon.py

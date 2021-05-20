@@ -1,0 +1,1 @@
+../seqtools/fastxPaste.py

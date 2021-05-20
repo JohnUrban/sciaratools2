@@ -1,0 +1,1 @@
+../seqtools/fastq2faqual.py

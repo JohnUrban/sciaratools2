@@ -1,0 +1,1 @@
+../seqtools/IUPAC-to-ACGT.py

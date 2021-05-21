@@ -1,0 +1,1 @@
+../seqtools/contigs-and-AGP-to-scaffolds.py

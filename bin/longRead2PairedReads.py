@@ -1,0 +1,1 @@
+../seqtools/longRead2PairedReads.py

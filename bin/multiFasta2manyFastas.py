@@ -1,0 +1,1 @@
+../seqtools/multiFasta2manyFastas.py

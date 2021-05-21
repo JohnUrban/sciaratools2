@@ -1,0 +1,1 @@
+../seqtools/fa2fq.py

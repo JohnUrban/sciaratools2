@@ -1,0 +1,1 @@
+../seqtools/fqEncoding.py

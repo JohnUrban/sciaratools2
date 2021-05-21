@@ -1,0 +1,1 @@
+../seqtools/scf-N-to-AGP.py

@@ -1,0 +1,1 @@
+../seqtools/qual2qual.py

@@ -1,0 +1,1 @@
+../tabletools/tableScoreComparison.py

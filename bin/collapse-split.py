@@ -1,0 +1,1 @@
+../tabletools/collapse-split.py

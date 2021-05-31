@@ -42,12 +42,21 @@ trial_scaffold_1        1       9       1       W       trial_scaffold_1_1      
 trial_scaffold_1        10      33      2       N       24      scaffold        yes     map
 trial_scaffold_1        34      39      3       W       trial_scaffold_1_3      1       6       +
 
-   
+
+Updates:
+5/28/2021   It now accepts AGP files with U components, in addition to N and W.
+            It writes N gaps of known length with uppercase NNNN and U gaps of unknown length with lowercase nnnn.
+            It is now more orientation-aware, and reverse-complements contigs when needed before adding to a growing scaffold.
+            Previously, my only use cases did not require this.
+            In total, this now works with AGP files provided by Phase Genomics for Hi-C scaffolds.
+            It also (already) works with AGP files produced from any set of scaffolds (e.g. bioNano) produced with scf-N-to-AGP.py.
+            Note: scf-N-to-AGP.py is now also updated to allow creation of U gap entries.
+            This script also can now handle comment/header lines starting with "#" (as in Phase Genomics AGP files).
 
 ''', formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("fasta")
 parser.add_argument("-a", "--agp", type=str, required=True, help='''Path to AGP.''')
-
+parser.add_argument("-v", "--verbose", action='store_true', default=False, help='''Messages to stderr about progress.''')
 args = parser.parse_args()
 
 
@@ -90,7 +99,7 @@ class AGP_RECORD(object):
     def contig_end(self, astype=int):
         return astype(self.agp_record[7])
 
-    def contig_orientation(self, astype=int):
+    def contig_orientation(self, astype=str):
         return astype(self.agp_record[8])
 
     def gapType(self, astype=str):
@@ -103,24 +112,65 @@ class AGP_RECORD(object):
         return astype(self.agp_record[8])
 
     def is_gap(self):
-        return self.component_type() == 'N'
+        return self.component_type() == 'N' or self.component_type() == 'U' 
 
     def is_contig(self):
         return self.component_type() == 'W'
 
+    def add_rev_comp(self):
+        return self.contig_orientation() == "-"
 
-
+    def gap_length_is_known(self):
+        return self.component_type() == 'N'
     
-def get_scaffold_sequence(scfinfo, contigs):
+    def gap_length_is_unknown(self):
+        return self.component_type() == 'U' 
+
+def get_ctg_msg(args, agp_record):
+    if args.verbose:
+        scf = agp_record.scaffold()
+        ctg = agp_record.contig_id()
+        stdsym = agp_record.contig_orientation()
+        stdadd = "-" if stdsym == "-" else "+"
+        msg ="Building:" + scf + "\n\tAdding:" + ctg + "\n\tStrandSymbol:" + stdsym + "\n\tStrandAdded:" + stdadd + "\n"
+        msg += "\t" + " ".join([e for e in agp_record.agp_record]) + "\n"
+        sys.stderr.write(msg)
+
+
+def get_gap_msg(args, agp_record):
+    if args.verbose:
+        scf = agp_record.scaffold()
+        gaplenstatus = "Known" if agp_record.gap_length_is_known() else "Unknown"
+        gapchar = "N" if agp_record.gap_length_is_known() else "n"
+        msg ="Building:" + scf + "\n\tAdding:Gap\n\tGapLength:" + str(agp_record.gapLength()) + "\n"
+        msg += "\tGapLengthStatus:" + gaplenstatus + "\n\tGapCharacter:" + gapchar + "\n"
+        msg += "\t" + " ".join([e for e in agp_record.agp_record]) + "\n"
+        sys.stderr.write(msg)
+
+def error_message(msg=""):
+    sys.stderr.write("ERROR: " + msg + "\n")
+    sys.stderr.write("You can't fire me if I QUIT.\n")
+    quit()
+        
+def get_scaffold_sequence(scfinfo, contigs, revcomp):
     seq = ''
     for agp_record in scfinfo:
         if agp_record.is_contig():
-            seq += contigs[agp_record.contig_id()]
+            get_ctg_msg(args, agp_record)
+            if agp_record.add_rev_comp():
+                seq += revcomp[agp_record.contig_id()]
+            else:
+                seq += contigs[agp_record.contig_id()]
         elif agp_record.is_gap():
-            seq += 'N' * agp_record.gapLength()
+            get_gap_msg(args, agp_record)
+            if agp_record.gap_length_is_known():
+                seq += 'N' * agp_record.gapLength()
+            elif agp_record.gap_length_is_unknown():
+                seq += 'n' * agp_record.gapLength()
+            else:
+                error_message("Encountered unexpected gap length status. Only takes N and U gap components for now.")
         else:
-            print("ERROR: Encountered unexpected component type. Only takes N and W for now. You can't fire me if I QUIT.")
-            quit()
+            error_message("Encountered unexpected component type. Only takes N, U, and W for now. You can't fire me if I QUIT.")
     return seq
 
 
@@ -129,8 +179,12 @@ def get_scaffold_sequence(scfinfo, contigs):
 #########################################################
 ## Read in FASTA into dictionary
 contigs = {}
+revcomp = {}
 for record in SeqIO.parse(args.fasta, 'fasta'):
     contigs[str(record.id)] = str(record.seq)
+    revcomp[str(record.id)] = str(record.seq.reverse_complement())
+    #ans = contigs[str(record.id)] == revcomp[str(record.id)]
+
 
 ## Read in AGP:
 AGP = open(args.agp).readlines()
@@ -139,6 +193,8 @@ AGP = open(args.agp).readlines()
 SCF = defaultdict(list)
 ORDER = []
 for line in AGP:
+    if line.startswith('#'):
+        continue
     line = line.strip().split()
     SCF[line[0]].append( AGP_RECORD(line) )
 
@@ -151,7 +207,7 @@ for scaffold in ORDER:
     print(">"+scaffold)
 
     # Return FASTA sequence
-    print(get_scaffold_sequence(SCF[scaffold], contigs))
+    print(get_scaffold_sequence(SCF[scaffold], contigs, revcomp))
 
 
         

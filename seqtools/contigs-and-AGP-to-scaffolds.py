@@ -4,6 +4,7 @@ import argparse, sys
 import re
 from Bio import SeqIO
 from collections import defaultdict
+from AGPtools import *
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description='''
@@ -61,119 +62,7 @@ args = parser.parse_args()
 
 
 ## DEFINITIONS
-class AGP_RECORD(object):
-    def __init__(self, l):
-        '''
-        Converts AGP lines into useful object.
-
-        INPUTS:
-        l = a list of all the elements of a line from AGP file (i.e. line.strip().split())
-        
-        '''
-        self.agp_record = l
-
-    def scaffold(self):
-        return self.agp_record[0]
-
-    def scaffold_start(self, astype=int):
-        return astype(self.agp_record[1])
-
-    def scaffold_end(self, astype=int):
-        return astype(self.agp_record[2])
-
-    def part_number(self, astype=int):
-        return astype(self.agp_record[3])
-
-    def component_type(self, astype=str):
-        return astype(self.agp_record[4])
-
-    def contig_id(self, astype=str):
-        return astype(self.agp_record[5])
-
-    def gapLength(self, astype=int):
-        return astype(self.agp_record[5])
-
-    def contig_start(self, astype=int):
-        return astype(self.agp_record[6])
-
-    def contig_end(self, astype=int):
-        return astype(self.agp_record[7])
-
-    def contig_orientation(self, astype=str):
-        return astype(self.agp_record[8])
-
-    def gapType(self, astype=str):
-        return astype(self.agp_record[6])
-
-    def linkage(self, astype=str):
-        return astype(self.agp_record[7])
-
-    def evidence(self, astype=str):
-        return astype(self.agp_record[8])
-
-    def is_gap(self):
-        return self.component_type() == 'N' or self.component_type() == 'U' 
-
-    def is_contig(self):
-        return self.component_type() == 'W'
-
-    def add_rev_comp(self):
-        return self.contig_orientation() == "-"
-
-    def gap_length_is_known(self):
-        return self.component_type() == 'N'
-    
-    def gap_length_is_unknown(self):
-        return self.component_type() == 'U' 
-
-def get_ctg_msg(args, agp_record):
-    if args.verbose:
-        scf = agp_record.scaffold()
-        ctg = agp_record.contig_id()
-        stdsym = agp_record.contig_orientation()
-        stdadd = "-" if stdsym == "-" else "+"
-        msg ="Building:" + scf + "\n\tAdding:" + ctg + "\n\tStrandSymbol:" + stdsym + "\n\tStrandAdded:" + stdadd + "\n"
-        msg += "\t" + " ".join([e for e in agp_record.agp_record]) + "\n"
-        sys.stderr.write(msg)
-
-
-def get_gap_msg(args, agp_record):
-    if args.verbose:
-        scf = agp_record.scaffold()
-        gaplenstatus = "Known" if agp_record.gap_length_is_known() else "Unknown"
-        gapchar = "N" if agp_record.gap_length_is_known() else "n"
-        msg ="Building:" + scf + "\n\tAdding:Gap\n\tGapLength:" + str(agp_record.gapLength()) + "\n"
-        msg += "\tGapLengthStatus:" + gaplenstatus + "\n\tGapCharacter:" + gapchar + "\n"
-        msg += "\t" + " ".join([e for e in agp_record.agp_record]) + "\n"
-        sys.stderr.write(msg)
-
-def error_message(msg=""):
-    sys.stderr.write("ERROR: " + msg + "\n")
-    sys.stderr.write("You can't fire me if I QUIT.\n")
-    quit()
-        
-def get_scaffold_sequence(scfinfo, contigs, revcomp):
-    seq = ''
-    for agp_record in scfinfo:
-        if agp_record.is_contig():
-            get_ctg_msg(args, agp_record)
-            if agp_record.add_rev_comp():
-                seq += revcomp[agp_record.contig_id()]
-            else:
-                seq += contigs[agp_record.contig_id()]
-        elif agp_record.is_gap():
-            get_gap_msg(args, agp_record)
-            if agp_record.gap_length_is_known():
-                seq += 'N' * agp_record.gapLength()
-            elif agp_record.gap_length_is_unknown():
-                seq += 'n' * agp_record.gapLength()
-            else:
-                error_message("Encountered unexpected gap length status. Only takes N and U gap components for now.")
-        else:
-            error_message("Encountered unexpected component type. Only takes N, U, and W for now. You can't fire me if I QUIT.")
-    return seq
-
-
+## Not "from AGPtools import *"
 
 
 #########################################################
@@ -207,7 +96,7 @@ for scaffold in ORDER:
     print(">"+scaffold)
 
     # Return FASTA sequence
-    print(get_scaffold_sequence(SCF[scaffold], contigs, revcomp))
+    print(get_scaffold_sequence(SCF[scaffold], contigs, revcomp, args.verbose))
 
 
         

@@ -57,47 +57,67 @@ Updates:
 ''', formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("fasta")
 parser.add_argument("-a", "--agp", type=str, required=True, help='''Path to AGP.''')
+parser.add_argument("-o", "--outfname", type=str, default='stdout', help='''Path to output filename. Stdout by default.''')
 parser.add_argument("-v", "--verbose", action='store_true', default=False, help='''Messages to stderr about progress.''')
 args = parser.parse_args()
 
 
-## DEFINITIONS
-## Not "from AGPtools import *"
 
 
-#########################################################
-## Read in FASTA into dictionary
-contigs = {}
-revcomp = {}
-for record in SeqIO.parse(args.fasta, 'fasta'):
-    contigs[str(record.id)] = str(record.seq)
-    revcomp[str(record.id)] = str(record.seq.reverse_complement())
-    #ans = contigs[str(record.id)] == revcomp[str(record.id)]
+## BEGINNING OF CODE
 
 
-## Read in AGP:
-AGP = open(args.agp).readlines()
 
-## Go through AGP and create defaultdict that maps scaffold names to agp lines
-SCF = defaultdict(list)
-ORDER = []
-for line in AGP:
-    if line.startswith('#'):
-        continue
-    line = line.strip().split()
-    SCF[line[0]].append( AGP_RECORD(line) )
 
-    if len(ORDER) == 0 or ORDER[-1] != line[0]:
-        ORDER.append( line[0] )
 
-## Go through scaffold information and put together
-for scaffold in ORDER:
-    # Return FASTA name
-    print(">"+scaffold)
 
-    # Return FASTA sequence
-    print(get_scaffold_sequence(SCF[scaffold], contigs, revcomp, args.verbose))
+build_and_print_scaffolds_from_contigs_and_agp( contig_fasta = args.fasta,
+                                                agp = args.agp,
+                                                outfname = args.outfname,
+                                                verbose = args.verbose)
 
+
+
+## END OF CODE
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##### DEPRECATED CODE
+#### Read in AGP:
+##AGP = open(args.agp).readlines()
+##
+#### Go through AGP and create defaultdict that maps scaffold names to agp lines
+##SCF = defaultdict(list)
+##ORDER = []
+##for line in AGP:
+##    if line.startswith('#'):
+##        continue
+##    line = line.strip().split()
+##    SCF[line[0]].append( AGP_RECORD(line) )
+##
+##    if len(ORDER) == 0 or ORDER[-1] != line[0]:
+##        ORDER.append( line[0] )
+##
+#### Go through scaffold information and put together
+##for scaffold in ORDER:
+##    # Return FASTA name
+##    print(">"+scaffold)
+##
+##    # Return FASTA sequence
+##    print(get_scaffold_sequence(SCF[scaffold], contigs, revcomp, args.verbose))
+##
 
         
         

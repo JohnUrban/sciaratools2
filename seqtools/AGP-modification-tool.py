@@ -18,13 +18,16 @@ AGP file modified according to instructions.
 - E.g. --reorient will change + to - or - to +.
 
 NOTE:
-In current version,
-- it will look for given names in both column 1 and 6 (scaffnames and contig names respectively).
-- it will make modification if name is in either one.
-- this is fine for now since there should be no multi-contig scaffold where the scaffold has the same name as one contig.
-    - single-contig scaffolds with the same name as the single contig will follow expected behavior as well
-- If name is a scaffold name, then every contig on the scaffold will be re-oriented (or otherwise modified).
-- If name is a contig name, only that contig will be re-oriented (or otherwise modified).
+In current version of re-orientation,
+- it will only look for given names in column 1 or (XOR) column 6 (scaffnames or contig names respectively).
+- If scaffold names are chosen, it will:
+    - reverse the order of contig appearance,
+    - re-number the scaffold parts s.t. in an n-part scaffold, the formerly nth part is now 1, and the formerly-first part is now n.
+    - adjust the coordinates in columns 2 and 3.
+    - re-orient strand (+ > -; - > +).
+    - NOTE: in downstream applications, compared to upstream ones, re-numbering scaffold parts means it will break relationships relying on identifying a ctg by a scaffold and its part number.
+        - I can make it optional to not re-number in the future, but personally have no use cases for that.
+- If contig names are chosen, each contig named will be re-oriented in place on the scaffold. 
 
 OTHER:
 AGP coordinates are 1-based inclusive.
@@ -59,49 +62,30 @@ parser.add_argument("-n", "--names", type=str, default=False, help='''Path singl
 parser.add_argument("-c", "--namescmd", type=str, default=False, help='''Comma-separated list from commandline.''')
 parser.add_argument("-R", "--reorient", action='store_true', default=False, help='''Re-orient sequences. If +, then -. If -, then +.''')
 parser.add_argument("-o", "--outputname", type=str, default=None, help='''AGP output filename. Default is to stdout.''')
+parser.add_argument("-T", "--target", type=str, default="s", required=True, help='''Provide "s" or "c" telling the script whether to focus on scaffolds or contigs only.''')
+parser.add_argument("-v", "--verbose", action='store_true', default=False, help='''Say stuff.''')
+parser.add_argument("-X", "--exclude_header", action='store_true', default=False, help='''Exclude header from output.''')
 
 args = parser.parse_args()
 
-## Definitions
-
-def is_target_for_modification(agp_record, names):
-    in_names = (agp_record.scaffold() in names or agp_record.contig_id() in names)
-    return in_names
-
-
 ## Get names:
 names = []
-if args.names:
-    #OPEN CONNECTION TO FILE/STDIN 
-    handle = sys.stdin if args.names in ('-','stdin') else open(args.names)
-    names += [line.strip() for line in handle]
-    if args.names not in ('-','stdin'):
-        handle.close()
-if args.namescmd:
-    names += [e.strip() for e in args.namescmd.strip().split(',')]
+names += get_line_list(args.names) if args.names else []
+names += [e.strip() for e in args.namescmd.strip().split(',')] if args.namescmd else []
 
 
-## Read in AGP:
-AGP = [AGP_RECORD(line.strip().split()) for line in open(args.agp).readlines() if not line.startswith('#')]
-
-## Open output connection
-outhandle = sys.stdout if args.outputname is None else open(args.outputname, 'w')
+## Read in and build AGP object
+AGP = AGP_FILE(args.agp)
 
 
-## Go through
-for agp_record in AGP:
-    # Make modifications according to options flagged IF record is a target for modifications.
-    if is_target_for_modification(agp_record, names):
+# Process AGP according to mod instructions
+# 1. Re-orientation
+if args.reorient:
+    reorient(AGP, names, args.target, args.verbose)
     
-        # 1. Re-orientation
-        if args.reorient and agp_record.is_sequence():
-            agp_record.reorient()
 
-        # 2. Something else... etc.
-    
-    # Return line / Write out
-    outhandle.write( agp_record.format_as_line() + '\n' )
-        
-# Close output connection
-if args.outputname is not None:
-    outhandle.close()
+# Write out modified AGP
+write_out_AGP_file_from_object(AGP = AGP,
+                               fh = args.outputname,
+                               include_header = not args.exclude_header)
+

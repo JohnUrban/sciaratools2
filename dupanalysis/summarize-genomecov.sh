@@ -91,12 +91,13 @@ PRE=${D}/${B}
 for C in ${PRE}.pos.txt ${PRE}.neg.txt; do
   grep genome ${C} | head -n 2 ; 
   grep genome ${C} | awk '$2>1 {s+=$5}END{print "genome\t2+\t-\t-\t"s}'
-  grep genome ${C} | awk '$2>1 {s+=$2*$3}END{print "genome\t2+\t-\tNreads\t"s}'
-  grep genome ${C} | awk '$2>1 {s+=($2-1)*($3)}END{print "genome\t2+\t-\tNreadsLeave1\t"s}'
+  grep genome ${C} | awk '$2>0 {s+=$2*$3}END{print "genome\t2+\t-\tNReadsFound\t"s}'
+  grep genome ${C} | awk '$2>1 {s+=$2*$3}END{print "genome\t2+\t-\tNDupsWhenLeave0\t"s}'
+  grep genome ${C} | awk '$2>1 {s+=($2-1)*($3)}END{print "genome\t2+\t-\tNDupsWhenLeave1\t"s}'
   echo
   grep genome ${C} | awk -v "K=$K" '$2>K {s+=$5}END{print "genome\t"K+1"+\t-\t-\t"s}'
-  grep genome ${C} | awk -v "K=$K" '$2>K {s+=$2*$3}END{print "genome\t"K+1"+\t-\tNreads\t"s}'
-  grep genome ${C} | awk -v "K=$K" '$2>K {s+=($2-K)*($3)}END{print "genome\t"K+1"+\t-\tNreadsLeaveK\t"s}'
+  grep genome ${C} | awk -v "K=$K" '$2>K {s+=$2*$3}END{print "genome\t"K+1"+\t-\tNreadsAtOffendingSites\t"s}'
+  grep genome ${C} | awk -v "K=$K" '$2>K {s+=($2-K)*($3)}END{print "genome\t"K+1"+\t-\tNDupsWhenLeaveK\t"s}'
   echo
   echo
 done

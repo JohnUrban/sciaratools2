@@ -90,6 +90,7 @@ PRE=${D}/${B}
 
 for C in ${PRE}.pos.txt ${PRE}.neg.txt; do
   grep genome ${C} | head -n 2 ; 
+  grep genome ${C} | awk '$2>0 {s+=$5}END{print "genome\t1+\t-\t-\t"s}'
   grep genome ${C} | awk '$2>1 {s+=$5}END{print "genome\t2+\t-\t-\t"s}'
   grep genome ${C} | awk '$2>0 {s+=$2*$3}END{print "genome\t2+\t-\tNReadsFound\t"s}'
   grep genome ${C} | awk '$2>1 {s+=$2*$3}END{print "genome\t2+\t-\tNDupsWhenLeave0\t"s}'

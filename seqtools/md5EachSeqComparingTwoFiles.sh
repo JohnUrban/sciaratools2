@@ -30,7 +30,7 @@ while read name ; do
   extractFastxEntries.py -c $name -f ${F2} > f2.${name}.fa ; 
   A=( $( md5sum-lite f1.${name}.fa ) ) ; 
   B=( $( md5sum-lite f2.${name}.fa ) ) ;  
-  echo -e "${A[1]}\t${B[1]}\t${A[0]}\t${B[0]}" ; 
+  echo -e "${A[1]}\t${B[1]}\t${A[0]}\t${B[0]}\t${name}" ; 
   rm f1.${name}.fa f2.${name}.fa
 done <  ${NAMES}
 

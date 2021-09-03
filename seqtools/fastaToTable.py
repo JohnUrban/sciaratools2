@@ -30,10 +30,10 @@ for fa in SeqIO.parse(args.fasta , "fasta"):
     name = a[0]
     seq = str(fa.seq)
     if len(a) > 1:
-    	other = args.delim.join(a[1:])
-	out = [name, seq, other]
+        other = args.delim.join(a[1:])
+        out = [name, seq, other]
     else:
-	out = [name, seq]
+        out = [name, seq]
     print('\t'.join(out))
 
 

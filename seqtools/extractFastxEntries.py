@@ -227,7 +227,8 @@ if args.fa:
 elif args.fq:
     fastx = "fastq"
 elif args.fastx: ## can figure out from file (right now not from stdin due to non-seekability)
-    line1 = fastxFile.next()[0]
+    ## py27: line1 = fastxFile.next()[0]
+    line1 = next(fastxFile)[0]
     if line1[0] == ">":
         fastx = "fasta"
     elif line1[0] == "@":

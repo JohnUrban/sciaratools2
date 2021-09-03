@@ -1,0 +1,1 @@
+../seqtools/genomeBlaster.sh

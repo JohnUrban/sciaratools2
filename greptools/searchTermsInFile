@@ -1,0 +1,6 @@
+#!/bin/bash
+
+FILE=$1
+TERMS=$2
+
+while read line; do if grep -q $line ${FILE} ; then echo $line ; fi ; done < ${TERMS}

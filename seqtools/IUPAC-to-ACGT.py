@@ -34,6 +34,13 @@ DESCRIPTION
     Unanticipated letters will be randomly changed to A, C, G, T.
     You can turn off this default and return the unanticipated letter using -K
     You can add un-anticipated letters using --anticipate argument to provide replacement options other than ACGT (e.g. just A)
+
+
+    
+
+    How to quickly check your FASTA for non-ACGTN letters...
+    grep -i -E 'KMSRWYBDHV' ${FASTA}
+    grep -c -i -E 'KMSRWYBDHV' ${FASTA}
     
     """, formatter_class= argparse.RawTextHelpFormatter)
 parser.add_argument('--fasta', '-f', required=True,
@@ -93,7 +100,9 @@ Since A did not occur in input sequence and therefore is 0 in terms of frquency,
 
 Can use --pseudocount to avoid any ACGT being 0.
 Can use --samplesize 0 so all are set to 1.
-Note however that both will globally affect all replacement choices.''')
+Note however that both will globally affect all replacement choices.
+
+''')
 
 args = parser.parse_args()
 

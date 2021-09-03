@@ -117,9 +117,14 @@ else:
         return stranslate(x)
     
 # Translate table
-with open(args.table) as table:
-    for line in table:
-        line = line.strip().split(args.input_delimiter)
-        print((args.output_delimiter).join([translate(line[i]) if i in tcols else line[i] for i in range(len(line)) ]))
-    
+table = sys.stdin if args.table in ('-', 'stdin') else open(args.table)
+
+#with open(args.table) as table:
+for line in table:
+    line = line.strip().split(args.input_delimiter)
+    print((args.output_delimiter).join([translate(line[i]) if i in tcols else line[i] for i in range(len(line)) ]))
+
+## Optional close:
+if args.table in ('-', 'stdin'):
+    table.close()
 

@@ -38,6 +38,13 @@ parser.add_argument("-no_other",
                     action='store_true', default=False,
                     help='''When using -even, -odd, or -only, the default behavior still returns 'other' sequences as is
                     w/o revcomping. Setting this says only return even, odd, or only arguments with revcomps -- nothing else, no other.''')
+
+parser.add_argument('--names', type=str, default=False,
+                   help='''Provide comma-separated list of names that may be encountered to reverse complement. Not mutually exclusive with --namesfile. Cannot be used with --cmdline.''')
+parser.add_argument('--namesfile', type=str, default=False,
+                   help='''Provide filepath for file containing 1 name per line for sequence names that may be encountered to reverse complement. Not mutually exclusive with --names. Cannot be used with --cmdline.''')
+
+
 ##parser.add_argument("-tag",
 ##                    action='store_true', default=False,
 ##                    help='''Tag revcomp seqnames with "_revcomp" at end.''')
@@ -45,44 +52,8 @@ parser.add_argument("-no_other",
 
 args = parser.parse_args()
 
-## Process arguments
-if args.only:
-    entrynums = set([int(e) for e in args.only.strip().split(',')])
-    
-if args.fa:
-    fastxFile = args.fa
-    fastx = "fasta"
-elif args.fq:
-    fastxFile = args.fq
-    fastx = "fastq"
-elif args.cmdline and args.cmdline in ("","-","stdin"):
-    fastxFile = args.cmdline
-else:
-    fastxFile = None
 
-
-## seq info coming from stdin?
-if fastxFile in ("","-","stdin"):
-    fastxFile = sys.stdin
-
-## Output file?
-if args.out:
-    args.out = open(args.out,"r")
-else:
-    args.out = sys.stdout
-
-#### append tag to name?
-##tag = "_revcomp" if args.tag else ""
-
-## Define "records"
-if args.cmdline and fastxFile == sys.stdin:
-    falist = fastxFile
-elif args.cmdline:
-    falist = args.cmdline.split(",")
-elif args.fa or args.fq:
-    falist = SeqIO.parse(fastxFile, fastx)
-
-
+## FUNCTIONS
 def getrevcomp(record, args, tag="\trevcomp"):
     if args.fa or args.fq:
         return ">"+ record.description + tag + "\n" + str(record.seq.reverse_complement()) + "\n"
@@ -95,26 +66,104 @@ def returnidentity(record, args):
     elif args.cmdline:
         return record + "\n"
 
+def run(args):    
+    ## Assertions
+    assert not ((args.names or args.namesfile) and args.cmdline)
 
-## Execute
-i = 0
-for record in falist:
-    i += 1
+    ## Process arguments
     if args.only:
-        if i in entrynums:
+        entrynums = set([int(e) for e in args.only.strip().split(',')])
+        
+    if args.fa:
+        fastxFile = args.fa
+        fastx = "fasta"
+    elif args.fq:
+        fastxFile = args.fq
+        fastx = "fastq"
+    elif args.cmdline and args.cmdline in ("","-","stdin"):
+        fastxFile = args.cmdline
+    else:
+        fastxFile = None
+
+
+    ## seq info coming from stdin?
+    if fastxFile in ("","-","stdin"):
+        fastxFile = sys.stdin
+
+    ## Output file?
+    if args.out:
+        args.out = open(args.out,"r")
+    else:
+        args.out = sys.stdout
+
+    #### append tag to name?
+    ##tag = "_revcomp" if args.tag else ""
+
+
+    ## NAMES?
+    seqnamesForRevComp = []
+    if args.names:
+        seqnamesForRevComp += args.names.strip().split(',')
+    if args.namesfile:
+        with open(args.namesfile) as fh:
+            seqnamesForRevComp += [line.strip() for line in fh.readlines()]
+    seqnamesForRevComp = set(seqnamesForRevComp)
+
+
+    ## Define "records"
+    if args.cmdline and fastxFile == sys.stdin:
+        falist = fastxFile
+    elif args.cmdline:
+        falist = args.cmdline.split(",")
+    elif args.fa or args.fq:
+        falist = SeqIO.parse(fastxFile, fastx)
+
+
+    ## Execute
+    i = 0
+    for record in falist:
+        i += 1
+        if args.only:
+            if i in entrynums:
+                args.out.write( getrevcomp(record, args) )
+            elif not args.no_other:
+                args.out.write( returnidentity(record, args) )
+                
+        elif args.even:
+            if i%2 == 0:
+               args.out.write( getrevcomp(record, args) )
+            elif not args.no_other:
+                args.out.write( returnidentity(record, args) )
+                
+        elif args.odd:
+            if i%2 == 1:
+               args.out.write( getrevcomp(record, args) )
+            elif not args.no_other:
+                args.out.write( returnidentity(record, args) )
+                
+        if args.names or args.namesfile:
+            if record.id in seqnamesForRevComp:
+                args.out.write( getrevcomp(record, args) )
+            else:
+                args.out.write( returnidentity(record, args) )
+                
+        else: ##ALL
             args.out.write( getrevcomp(record, args) )
-        elif not args.no_other:
-            args.out.write( returnidentity(record, args) )
-    elif args.even:
-        if i%2 == 0:
-           args.out.write( getrevcomp(record, args) )
-        elif not args.no_other:
-            args.out.write( returnidentity(record, args) )
-    elif args.odd:
-        if i%2 == 1:
-           args.out.write( getrevcomp(record, args) )
-        elif not args.no_other:
-            args.out.write( returnidentity(record, args) )
-    else: ##ALL
-        args.out.write( getrevcomp(record, args) )
-args.out.close()
+
+
+    ## CLOSE FILE WHEN DONE
+    args.out.close()
+
+
+
+
+
+
+
+
+
+
+###############################
+''' EXECUTE '''
+###############################
+run(args)

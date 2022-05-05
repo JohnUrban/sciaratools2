@@ -360,7 +360,7 @@ for record in SeqIO.parse(handle, "fasta"):
     if numgaps == 0:
         # Single contig - write AGP 
         outline = ("\t").join([str(e) for e in (P+str(record.id), 1, scflength, 1, 'W', P+str(record.id)+'_1', 1, scflength, '+')])
-        AGP.write( outline + '\n')
+        AGP_fh.write( outline + '\n')
         # Write contig 
         append_sequence_to_fasta(contigs_fh,
                                  record,

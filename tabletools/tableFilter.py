@@ -4,84 +4,143 @@ import sys, argparse
 from collections import defaultdict
 
 
-parser = argparse.ArgumentParser(description="""
 
-DESCRIPTION -
+def parse_args():
+    parser = argparse.ArgumentParser(description="""
 
-    Given table,
-        keep only 1 line for each element in name column 
-        that has the highest score in score column.
+    DESCRIPTION -
 
-    Use case:
-    BLASTP output on gene set, keep entry with highest bit score.
+        Given table,
+            keep only 1 line for each element in name column 
+            that has the highest score in score column.
 
-    """, formatter_class= argparse.RawTextHelpFormatter)
+        Use case:
+        BLASTP output on gene set, keep entry with highest bit score.
 
-parser.add_argument('table', metavar='table', nargs='*',
-                   type= str, 
-                   help='''Paths to as many tables as you want. They will be treated as one giant table.
-                        This can also be left empty for standard in or specified as - or stdin.''')
+        """, formatter_class= argparse.RawTextHelpFormatter)
 
-parser.add_argument('-n', '--name_column', type=int, default=1,
-                    help='''Column where elements/names are found.''')
+    parser.add_argument('table', metavar='table', nargs='*',
+                       type= str, 
+                       help='''Paths to as many tables as you want. They will be treated as one giant table.
+                            This can also be left empty for standard in or specified as - or stdin.''')
 
-parser.add_argument('-s', '--score_column', type=int, default=2,
-                    help='''Column where scores are found.''')
+    parser.add_argument('-n', '--name_column', type=int, default=1,
+                        help='''Column where elements/names are found.''')
 
-
-parser.add_argument('-d', '--delim', type=str, default='\t',
-                    help='''Delimiter. Default = tab.''')
-
-args = parser.parse_args()
+    parser.add_argument('-s', '--score_column', type=int, default=2,
+                        help='''Column where scores are found.''')
 
 
+    parser.add_argument('-d', '--delim', type=str, default='\t',
+                        help='''Delimiter. Default = tab.''')
+
+    args = parser.parse_args()
+    return args
 
 
-if len(args.table) == 0 or args.table[0] in ('stdin', '-') or args.table[0].startswith('<('):
-    args.table = [sys.stdin]
-    def opentable(x):
-        return x
-    def closetable(x):
-        return x
-else:
-    def opentable(x):
-        return open(x)
-    def closetable(x):
-        return x.close()
+def tableFilter_step01(tables):
+    ''' tables is a list of filenames for tabular-like files'''
+    if len(tables) == 0 or tables[0] in ('stdin', '-') or tables[0].startswith('<('):
+        tables = [sys.stdin]
+        def opentable(x):
+            return x
+        def closetable(x):
+            return x
+    else:
+        def opentable(x):
+            return open(x)
+        def closetable(x):
+            return x.close()
+    return tables, opentable, closetable
 
-lines = {}
-scores = {}
-score_col = args.score_column - 1
-name_col = args.name_column - 1
-order = []
 
-for table in args.table:
-    tablefile = opentable(table)
-    for line in tablefile:
-        line = line.strip().split(args.delim)
-        score = float(line[score_col])
-        order.append(line[name_col])
-        try:
-            if score > scores[line[name_col]]:
+def tableFilter_step02(tables, delim, score_col, name_col, opentable, closetable):
+    ''' tables is a list of filenames for tabular-like files'''
+    lines = {}
+    scores = {}
+    order = []
+    for table in tables:
+        tablefile = opentable(table)
+        for line in tablefile:
+            line = line.strip().split(delim)
+            score = float(line[score_col])
+            order.append(line[name_col])
+            try:
+                if score > scores[line[name_col]]:
+                    scores[line[name_col]] = score
+                    lines[line[name_col]] = line
+            except:
                 scores[line[name_col]] = score
                 lines[line[name_col]] = line
-        except:
-            scores[line[name_col]] = score
-            lines[line[name_col]] = line
-    closetable(tablefile)
+        closetable(tablefile)
+    return lines, scores, order
+    
 
-
-
-
-## Output in order of appearance in input
-for name in order:
+def tableFilter_step03(lines, order, delim):
+    ''' tables is a list of filenames for tabular-like files'''
+    ## Output in order of appearance in input
+    for name in order:
         try:
-            print((args.delim).join(lines[name]))
+            print( (delim).join(lines[name]) )
             lines.pop(name)
         except:
             ## The intention is to cause it to fail silently after seeing element once and printing
             ## However, this can cause it to fail silently in unanticipated scenarios as well.
             pass
+
+def tableFilterPipeline(tables, delim, score_col, name_col):
+    ''' tables is a list of filenames for tabular-like files'''
+    ## Step 1
+    tables, opentable, closetable = tableFilter_step01( tables = tables )
+
+    ## Step 2
+    lines, scores, order = tableFilter_step02(  tables      = tables,
+                                                delim       = delim,
+                                                score_col   = score_col,
+                                                name_col    = name_col,
+                                                opentable   = opentable,
+                                                closetable  = closetable)
+    ## Step 3
+    tableFilter_step03(lines, order, delim)
+
+    ## Return None
+    return None
+    
+
+def main():
+    ## Get ARGs
+    args = parse_args()
+
+    ## Process ARGs
+    score_col = args.score_column - 1
+    name_col = args.name_column - 1
+
+    ## Execute
+    tableFilterPipeline(tables      = args.table,
+                        delim       = args.delim,
+                        score_col   = score_col,
+                        name_col    = name_col)
+
+
+    
+
+
+##############################################################################
+''' EXECUTE '''
+##############################################################################
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
+
+
+##############################################################################
+''' DEPRECATED CODE '''
+##############################################################################
 
 
 ## BELOW DOES NOT WORK WITH STDIN

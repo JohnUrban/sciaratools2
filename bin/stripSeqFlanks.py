@@ -1,0 +1,1 @@
+../seqtools/stripSeqFlanks.py

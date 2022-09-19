@@ -1,0 +1,1 @@
+../seqtools/md5EachSeqComparingTwoSeqs.sh

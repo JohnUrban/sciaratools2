@@ -1,79 +1,125 @@
 #!/usr/bin/env python3
 
-import sys, argparse, re
+import sys, argparse, re, os
 from collections import defaultdict
-
-parser = argparse.ArgumentParser(description="""
-    This is experimental - and may not work appropriately with ALL BED files as it was only tested on ones I needed.
-    
-    Input: Sorted BED file with 4 columns: chr, start, end, name.
-        To unix sort: sort -k1,1 -k2,2n -k3,3n
-        Or: sortBed -i -
-
-        OR better:
-        Give a pre-computed slice file:
-        awk 'OFS="\\t" {print $1,$2,"s",NR,$4,$5"\\n"$1,$3,"e",NR}' file.bed | sort -k1,1 -k2,2n > file.slice.txt
-
-        Above AWK assumes 5 columns (chr, start, end, name, score).
-        If no score col, do:
-        awk 'OFS="\\t" {print $1,$2,"s",NR,$4,0"\\n"$1,$3,"e",NR}' file.bed | sort -k1,1 -k2,2n > file.slice.txt
-    Output:
-        Updated BED file s.t. overlapping intervals get comma-separated names for names that occurred there.
-    """, formatter_class= argparse.RawTextHelpFormatter)
-
-
-parser.add_argument('--bedfile', '-f', 
-                   type=str, default=False,
-                   help='''BED file. Can be "stdin", "-", or "<()" as well. ''')
-
-parser.add_argument('--slicefile', '-s',
-                   type=str, default=False,
-                   help='''Slice file as described above. ''')
-
-parser.add_argument('--maxScoreOnly', '-M',
-                   action='store_true', default=False,
-                   help='''For each sliced and diced interval, only report the name of the element that had the highest score over those bases (where score in column 5)''')
-
-parser.add_argument('--minScoreOnly', '-m',
-                   action='store_true', default=False,
-                   help='''For each sliced and diced interval, only report the name of the element that had the lowest score over those bases.''')
-
-parser.add_argument('--sortedNames', '-S',
-                   action='store_true', default=False,
-                   help='''Does not work with -m/-M. By default, the collapsed names and scores in same order are given in 4th and 5th column.
-                    This pushes those to the 5th and 6th columns, and provides a different names column for the 4th where
-                    the names are sorted s.t. any time a set of names occurs in the column, the should specify the same permutation.
-                    This makes it easier to computer sums of intersecting intervals with AWK, for example.''')
-
-parser.add_argument('--scoring',
-                   type=str, default='default',
-                   help='''How to report interval scores. Default is comma-sep lists. Optionally use min, max, sum, or mean.
-                   --maxScoreOnly and --minScoreOnly tell it to use max and min, respectively.
-                   Right now only min and max can be used with BED4/bedGraph input.
-                   All can be used with slice file input.''')
-
-
-args = parser.parse_args()
-
-
-patterns = defaultdict(int)
+import numpy as np
 
 
 
 
+##############################################################################
+''' FUNCTIONS '''
+##############################################################################
+def parse_args():
+    parser = argparse.ArgumentParser(description="""
+        This is experimental - and may not work appropriately with ALL BED files as it was only tested on ones I needed.
+        
+        Input:
+            - BED file or Slice file constructed from BED file (see below on how with awk and sort).
 
-## FUNCTIONS
+
+            Automatically sorts, but older input requests were:
+            Sorted BED file with 4 columns: chr, start, end, name.
+            To unix sort: sort -k1,1 -k2,2n -k3,3n
+            Or: sortBed -i -
+
+            OR better:
+            Give a pre-computed slice file:
+            awk 'OFS="\\t" {print $1,$2,"s",NR,$4,$5"\\n"$1,$3,"e",NR}' file.bed | sort -k1,1 -k2,2n > file.slice.txt
+
+            Better yet but not necessary, sort the BED before computing the slice lines above:
+            sort -k1,1 -k2,2n file.bed  | awk 'OFS="\\t" {print $1,$2,"s",NR,$4,$5"\\n"$1,$3,"e",NR}' | sort -k1,1 -k2,2n > file.slice.txt
+            OR:
+            sortBed -i file.bed  | awk 'OFS="\\t" {print $1,$2,"s",NR,$4,$5"\\n"$1,$3,"e",NR}' | sort -k1,1 -k2,2n > file.slice.txt
+
+            
+            Above AWK assumes 5 columns (chr, start, end, name, score).
+            If no score col, do:
+            awk 'OFS="\\t" {print $1,$2,"s",NR,$4,0"\\n"$1,$3,"e",NR}' file.bed | sort -k1,1 -k2,2n > file.slice.txt
+
+        Output:
+            Updated BED file s.t. overlapping intervals get comma-separated names for names that occurred there.
+
+
+        UPDATE LOG:
+        2021-September:
+            - Code reorganized
+                - Everything, even argparsing, has been converted to functions.
+                - The following line has been added to allow this file to serve as an import library for other scripts to borrow its functions.
+                    - ' if __name__ == "__main__" '
+                - One such script that borrows functions is associateSequences.py
+            - For the BED option:
+                - This script now auto-generates a slice file from the BED file in a tmp dir
+                - It then conducts the same workflow on the tmpdir slice file as it would with a given slice file.
+                - Previously, it attempted to work on the BED with no intermediate.
+                    - However, the operations on the slice files generated by AWK and sort have been much more developed.
+                    - Therefore, the decision was to simply perform slice-file construction as a convenience within Python ...
+                    -   ... rather than play catch-up in developing the direct BED operations.
+        """, formatter_class= argparse.RawTextHelpFormatter)
+
+
+    parser.add_argument('--bedfile', '-f', 
+                       type=str, default=False,
+                       help='''BED file. Can be "stdin", "-", or "<()" as well. ''')
+
+    parser.add_argument('--slicefile', '-s',
+                       type=str, default=False,
+                       help='''Slice file as described above. ''')
+
+    parser.add_argument('--maxScoreOnly', '-M',
+                       action='store_true', default=False,
+                       help='''For each sliced and diced interval, only report the name of the element that had the highest score over those bases (where score in column 5)''')
+
+    parser.add_argument('--minScoreOnly', '-m',
+                       action='store_true', default=False,
+                       help='''For each sliced and diced interval, only report the name of the element that had the lowest score over those bases.''')
+
+    parser.add_argument('--sortedNames', '-S',
+                       action='store_true', default=False,
+                       help='''Does not work with -m/-M. By default, the collapsed names and scores in same order are given in 4th and 5th column.
+                        This pushes those to the 5th and 6th columns, and provides a different names column for the 4th where
+                        the names are sorted s.t. any time a set of names occurs in the column, the should specify the same permutation.
+                        This makes it easier to computer sums of intersecting intervals with AWK, for example.''')
+
+    parser.add_argument('--scoring',
+                       type=str, default='default',
+                       help='''How to report interval scores. Default is comma-sep lists. Optionally use min, max, sum, or mean.
+                       --maxScoreOnly and --minScoreOnly tell it to use max and min, respectively.
+                       Right now only min and max can be used with BED4/bedGraph input.
+                       All can be used with slice file input.''')
+
+    parser.add_argument('--outputfile', '-o',
+                       type=str, default='-',
+                       help='''Name of output file. Stdout by default. ''')
+
+    args = parser.parse_args()
+    return args
+
 def get_connection(fh):
-    stdin = fh in ['stdin', '-'] or fh[:1] == '<('
-    if stdin:
-        return sys.stdin
+    is_stdin = fh in ['stdin', '-'] or fh[:1] == '<('
+    if is_stdin:
+        return sys.stdin, is_stdin
     else:
-        return open(fh), stdin
+        return open(fh), is_stdin
 
-def close_connection(f, stdin):
-    if not stdin:
+def close_connection(f, is_stream):
+    if not is_stream:
         f.close()
 
+def get_output_connection(fh):
+    is_stdout = fh in ['stdout', '-']
+    if is_stdout:
+        return sys.stdout, is_stdout
+    else:
+        return open(fh, 'w'), is_stdout
+
+
+def get_file_lines(fname):
+    ''' fname = path to file.
+    Note: this def also occurs in associateSequences.py'''
+    with open(fname) as fh:
+        lines = [e.strip().split() for e in fh.readlines() if not e.startswith('#')]
+    return lines
 
 class Interval(object):
     def __init__(self, line):
@@ -229,7 +275,15 @@ class SliceLine(object):
     def __str__(self):
         return '\t'.join(self.line)
 
-def slice3(slice_fh, scoring='default', sortedNames=False):
+def slice3(inconn, outconn, scoring='default', sortedNames=False, mode='write', sortstoredbedlist=True):
+    '''
+    inconn      =   'r' open connection or sys.stdin
+    outconn     =   'w' open connection or sys.stdout
+    scoring     =   strategy to deal with intersects
+    sortedNames =   True/False whether to output sorted names (see code)
+    mode        =   '[ write | store | both ]' : whether to write to file or stdout ('write') or to store BED-like lines in list object ('store') to return when function completes.
+    '''
+    assert mode in ('write', 'store', 'both')
     maxScoreOnly = True if scoring == 'max' else False
     minScoreOnly = True if scoring == 'min' else False
     sumScore = True if scoring == 'sum' else False
@@ -241,54 +295,155 @@ def slice3(slice_fh, scoring='default', sortedNames=False):
     score = {}
     #idxs = []
     last_coord = None
-    with open(slice_fh) as f:
-        for line in f:
-            line = SliceLine(line)
-            if chrom is None:
-                chrom = line.chr
-            if line.chr != chrom:
-                assert name == {}
-                last_coord = None
-                chrom = line.chr
-            if last_coord is not None and line.coord > last_coord:
-                if maxScoreOnly:
-                    idx = max(score, key=score.get)
-                    names = name[idx]
-                    scores = score[idx]
-                elif minScoreOnly:
-                    idx = min(score, key=score.get)
-                    names = name[idx]
-                    scores = score[idx]
-                elif sumScore:
-                    names = ','.join([str(e) for e in sorted(list(set(name.values())))])
-                    scores = sum([float(e) for e in list(score.values())])
-                elif meanScore:
-                    names = ','.join([str(e) for e in sorted(list(set(name.values())))])
-                    scores = float(sum([float(e) for e in list(score.values())]))/len(list(score.values()))
-                else:
-                    #names = ','.join([str(e) for e in name.values()])
-                    #scores = ','.join([str(e) for e in score.values()])
-                    names = ','.join([str(name[e]) for e in sorted(name.keys())])
-                    scores = ','.join([str(score[e]) for e in sorted(score.keys())])
-                if sortedNames:
-                    snames = ','.join([str(e) for e in sorted(name.values())])
-                    bed = [chrom, last_coord, line.coord, snames, names, scores]
-                    ## names and scores should be in same order whereas snames makes it easier to compute sums outside of script
-                else:
-                    bed = [chrom, last_coord, line.coord, names, scores] ## names and scores should be in same order
-                print('\t'.join([str(e) for e in bed]))
-            if line.instruct == 's':
-                name[line.idx] = line.name
-                score[line.idx] = line.score
-            if line.instruct == 'e':
-                name.pop(line.idx)
-                score.pop(line.idx)
-            if name == {}:
-                last_coord = None
+    if mode == 'store' or mode == 'both':
+        bedlist = []
+    ## LOOP
+    #with open(slice_fh) as inconn:
+    for line in inconn:
+        line = SliceLine(line)
+        if chrom is None:
+            chrom = line.chr
+        if line.chr != chrom:
+            assert name == {}
+            last_coord = None
+            chrom = line.chr
+        if last_coord is not None and line.coord > last_coord:
+            if maxScoreOnly:
+                idx = max(score, key=score.get)
+                names = name[idx]
+                scores = score[idx]
+            elif minScoreOnly:
+                idx = min(score, key=score.get)
+                names = name[idx]
+                scores = score[idx]
+            elif sumScore:
+                names = ','.join([str(e) for e in sorted(list(set(name.values())))])
+                scores = sum([float(e) for e in list(score.values())])
+            elif meanScore:
+                names = ','.join([str(e) for e in sorted(list(set(name.values())))])
+                scores = float(sum([float(e) for e in list(score.values())]))/len(list(score.values()))
             else:
-                last_coord = line.coord
+                #names = ','.join([str(e) for e in name.values()])
+                #scores = ','.join([str(e) for e in score.values()])
+                names = ','.join([str(name[e]) for e in sorted(name.keys())])
+                scores = ','.join([str(score[e]) for e in sorted(score.keys())])
+            if sortedNames:
+                snames = ','.join([str(e) for e in sorted(name.values())])
+                bed = [ chrom,
+                        last_coord,
+                        line.coord,
+                        snames,
+                        names,
+                        scores ]
+                ## names and scores should be in same order whereas snames makes it easier to compute sums outside of script
+            else:
+                bed = [ chrom,
+                        last_coord,
+                        line.coord,
+                        names,
+                        scores ] ## names and scores should be in same order
+            ## OUTPUT DECISION
+            if mode == 'write' or mode == 'both':
+                ##print('\t'.join([str(e) for e in bed]))
+                outconn.write( '\t'.join([str(e) for e in bed]) + '\n' )
+            if mode == 'store' or mode == 'both':
+                bedlist.append( bed )
+        if line.instruct == 's':
+            name[line.idx] = line.name
+            score[line.idx] = line.score
+        if line.instruct == 'e':
+            name.pop(line.idx)
+            score.pop(line.idx)
+        if name == {}:
+            last_coord = None
+        else:
+            last_coord = line.coord
+    if mode == 'store' or mode == 'both':
+        if sortstoredbedlist:
+            return sortbed( bedlist )
+        else:
+            return bedlist
+    else:
+        return None
+
             
-                
+def run_sliceToBed(slicefile, outputfile, scoring='default', sortedNames=False, mode='write'):
+    ''' Wraps over slice3() '''
+    ## OPEN INPUT CONNECTION
+    inconn, is_stdin = get_connection(fh = slicefile)
+
+    ## OPEN OUTPUT CONNECTION
+    outconn, is_stdout = get_output_connection(fh = outputfile)
+
+    ## DO STUFF -- outbed is just None for now
+    outbed = slice3(inconn = inconn,
+                    outconn = outconn,
+                    scoring = scoring,
+                    sortedNames = sortedNames,
+                    mode = mode)
+
+    ## CLOSE CONNECTIONS
+    close_connection(inconn, is_stdin)
+    close_connection(outconn, is_stdout)
+
+    ## RETURN
+    return outbed
+
+def sortbed(bed, assume_bed_sorted=False):
+    if not assume_bed_sorted:
+        bed.sort(key=lambda x: (x[0], int(x[1])) )
+    return bed
+
+
+            
+
+def create_sorted_slice_file_from_bed(bed_fname, out_fname, namecol=3, scorecol=4, mode='write', assume_bed_sorted = False):
+    '''
+    bed_fname           = filename / path to file
+    out_fname           = filename / path to file
+    namecol             = 0-based index expected to find name (or alt score) in
+    scorecol            = 0-based index expected to find score in
+    assume_bed_sorted   = True/False ; if False, will sort bed input
+    mode                = '[ write | store | both ]' : whether to write to file or stdout ('write') or to store BED-like lines in list object ('store') to return when function completes.
+    '''
+    ## awk 'OFS="\t" {print $1,$2,"s",NR,NameOrAltScore,TargetScore,"\n"$1,$3,"e",NR}'
+    ## e.g. awk 'OFS="\t" {print $1,$2,"s",NR,$4,$5"\n"$1,$3,"e",NR}' file.bed | sort -k1,1 -k2,2n > file.slice.txt
+    ## sort by first element: sorted(lis, key=lambda x: x[0]) or unsorted_list.sort(key=lambda x: x[0])
+    ## sort by kth element : unsorted_list.sort(key=lambda x: x[k])
+    ## sort by kth and jth elements: sorted(ls, key=lambda x: (x[k],x[j]) )
+    assert mode in ('write', 'store', 'both')
+    bedlike = sortbed( bed = get_file_lines(bed_fname),
+                       assume_bed_sorted = assume_bed_sorted)
+    n_intervals = len(bedlike)
+    slice_list = []
+    ## Collect all slice info
+    for i in range(n_intervals):
+        ## Make elements obvious
+        interval = bedlike[i]
+        name = interval[0]
+        start = int( interval[1] )
+        end = int( interval[2] )
+        nameOrAltScore = interval[ namecol ]
+        targetScore = interval [ scorecol ]
+        NR = i+1
+        ## conbstruct the 2 slice lines from 1 bed line
+        line1 = [name, start, 's', NR, nameOrAltScore, targetScore]
+        line2 = [name, end, 'e', NR]
+        ## add slice lines to growing slice list
+        slice_list.append( line1 )
+        slice_list.append( line2 )
+    ## Sort slice info in-place
+    slice_list.sort(key=lambda x: (x[0], int(x[1])) )
+
+    ## Output:
+    if mode == 'write' or mode == 'both':
+        with open(out_fname, 'w') as slice_out:
+            for sliceline in slice_list:
+                slice_out.write( '\t'.join(str(e) for e in sliceline) + '\n' )
+    if mode == 'store' or mode == 'both':
+        return slice_list
+    else:
+        return None
             
 
 def main(args):
@@ -300,22 +455,87 @@ def main(args):
         args.scoring = 'min'
         
     if args.bedfile:
+        SEED        = np.random.randint(10000000,99999999)
+        TMPDIR      = "partition_tmpdir_" + str(SEED)
+        tmpslice    = TMPDIR + "/01-tmp-paf.slice.txt"
+        os.mkdir(TMPDIR)
+        slice_list = create_sorted_slice_file_from_bed(
+            bed_fname   = args.bedfile,
+            out_fname   = tmpslice,
+            namecol     = 4,
+            scorecol    = 5,
+            mode        = 'write')
+        run_sliceToBed(slicefile    = tmpslice,
+                       outputfile   = args.outputfile,
+                       scoring      = args.scoring,
+                       sortedNames  = args.sortedNames,
+                       mode = 'write')
+
+    elif args.slicefile:
+        run_sliceToBed(slicefile = args.slicefile,
+                       outputfile = args.outputfile,
+                       scoring = args.scoring,
+                       sortedNames = args.sortedNames,
+                       mode = 'write')
+
+
+##############################################################################
+''' EXECUTE '''
+##############################################################################
+
+if __name__ == "__main__":
+    args = parse_args()
+    patterns = defaultdict(int)
+    main(args)
+
+
+
+
+
+##############################################################################
+''' DEPRECATED '''
+##############################################################################
+
+## BEDFILE APPROACH BEING PHASED OUT.... UPDATES NOT APPLIED TO IT.
         # painfully slow for the moment
         # can have it create a slice file on the fly in the future...
         # for now I prefer just giving the slice file
         # That will be in the fxn slice2 above
-        for line in slice_and_dice(BED4(args.bedfile), scoring=args.scoring):
-            print(line)
-
-    elif args.slicefile:
-        slice3(args.slicefile, scoring=args.scoring, sortedNames=args.sortedNames)
+        #for line in slice_and_dice(BED4(args.bedfile), scoring=args.scoring):
+        #    print(line)
 
 
-## EXECUTE:
-
-
-
-
-
-
-main(args)
+## TO DEPRECATE
+##def create_unsorted_slice_file_from_bed(bed_fname, out_fname, namecol=3, scorecol=4, assume_bed_sorted=False, mode='write'):
+##    '''
+##    bed_fname           = filename / path to file
+##    out_fname           = filename / path to file
+##    namecol             = 0-based index expected to find name (or alt score) in
+##    scorecol            = 0-based index expected to find score in
+##    assume_bed_sorted   = True/False ; if False, will sort bed input
+##    mode                = '[ write | store | both ]' : whether to write to file or stdout ('write') or to store BED-like lines in list object ('store') to return when function completes.
+##    '''
+##    ## awk 'OFS="\t" {print $1,$2,"s",NR,NameOrAltScore,TargetScore,"\n"$1,$3,"e",NR}'
+##    ## e.g. awk 'OFS="\t" {print $1,$2,"s",NR,$4,$5"\n"$1,$3,"e",NR}' file.bed | sort -k1,1 -k2,2n > file.slice.txt
+##    bedlike = sortbed( bed = get_file_lines(bed_fname),
+##                       assume_bed_sorted = assume_bed_sorted)
+##    n_intervals = len(bedlike)
+##    if mode == 'store' or mode == 'both':
+##        slice_list = []
+##    with open(out_fname, 'w') as slice_out:
+##        for i in range(n_intervals):
+##            interval = bedlike[i]
+##            name = interval[0]
+##            start = interval[1]
+##            end = interval[2]
+##            nameOrAltScore = interval[ namecol ]
+##            targetScore = interval [ scorecol ]
+##            NR = i+1
+##            line1 = '\t'.join( str(e) for e in [name, start, 's', NR, nameOrAltScore, targetScore] )
+##            line2 = '\t'.join( str(e) for e in [name, end, 'e', NR] )
+##            if mode == 'write' or mode == 'both':
+##                slice_out.write( line1 + '\n' + line2 + '\n' )
+##            elif mode == 'store':
+##                slice_list.append( line1 )
+##                slice_list.append( line2 )
+            

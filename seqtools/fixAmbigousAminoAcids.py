@@ -24,13 +24,14 @@ DESCRIPTION
         - X converted to any canonical AA
         - Z converted to E or Q
     
-    Anticipated removal characters: * .
-        - For example OorthoDB v10 had protein sequences that ended with a dot "."
-        - OrthoDB v10 and v11 have "*" characters in the sequences.
 
     Unanticipated letters are any other character encountered in sequence. These are treated like "X" by default.
 
     
+    Recommended removal characters: * .
+        - For example OorthoDB v10 had protein sequences that ended with a dot "."
+        - OrthoDB v10 and v11 have "*" characters in the sequences.
+
 
     How to quickly check your FASTA for non-canonical and ambiguous letters...
     grep -i -E 'OUBZXJ' ${FASTA} | grep -v ">" | less
@@ -106,8 +107,14 @@ parser.add_argument('--lower', '-L',
                    action='store_true', default=False,
                    help='''Return output sequence entirely lower-case instead of as is. Default: False.''')
 parser.add_argument('--keep_unexpected', '-K', 
-                   action='store_true', default=False,
+                   type=str, default=False,
                    help='''When unanticipated letter is encountered, keep it as is instead of converting it using the X rule. Default: False.''')
+
+parser.add_argument('--remove', '-r', 
+                   type=str, default=False,
+                   help='''Characters to remove when seen in protein sequence. For example, both * and . are seen in orthoDB protein sequences.
+Recommended: --remove "*." (quotes needed).
+Otherwise these characters will be treated as any other unanticipated character and replaced by the X rule.''')
 
 parser.add_argument('--anticipate', '-A', 
                    type=str, default=False,
@@ -210,6 +217,9 @@ translate['O'] = lambda : choice(["A","C","D","E","F","G","H","I","K","L","M","N
 translate['o'] = lambda : choice(["a","c","d","e","f","g","h","i","k","l","m","n","p","q","r","s","t","v","w","y"], p = probs('ACDEFGHIKLMNPQRSTVWY',freq))
 
 
+if args.remove:
+    for char in args.remove:
+        translate[char] = lambda : ''
 
 
 if args.anticipate:

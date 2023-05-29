@@ -81,7 +81,7 @@ if args.othercols:
     assert nOtherKolFxns == 1 or nOtherKolFxns == nOtherKols
     
     if nOtherKolFxns == 1:
-        otherKolFxnTerms = otherKolFxns*nOtherKols
+        otherKolFxnTerms = otherKolFxnTerms*nOtherKols
 
     otherKolFxns = []
     for e in otherKolFxns:

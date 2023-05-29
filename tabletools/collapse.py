@@ -75,13 +75,31 @@ if args.othercols:
     kols = [int(e)-1 for e in args.othercols.strip().split(",")]
     nOtherKols = len(kols)
 
-    otherKolFxns = args.otherOperation.strip().split(",")
-    nOtherKolFxns = len(otherKolFxns)
+    otherKolFxnTerms = args.otherOperation.strip().split(",")
+    nOtherKolFxns = len(otherKolFxnTerms)
 
     assert nOtherKolFxns == 1 or nOtherKolFxns == nOtherKols
     
     if nOtherKolFxns == 1:
-        otherKolFxns = otherKolFxns*nOtherKols
+        otherKolFxnTerms = otherKolFxns*nOtherKols
+
+    otherKolFxns = []
+    for e in otherKolFxns:
+        if e == 'sum':
+            fxn = sum
+        elif e == 'max':
+            fxn = max
+        elif e == 'min':
+            fxn = min
+        elif e == 'mean':
+            fxn = np.mean
+        elif e == 'median':
+            fxn = np.median
+        elif e == 'list':
+            fxn = listfxn
+        elif e == 'distinct':
+            fxn = distinctfxn
+        ops.append(fxn)
     
     DD = {}
     for col in kols:

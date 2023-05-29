@@ -40,6 +40,8 @@ parser.add_argument('--addcol', '-c3', type=str, default=False,
 parser.add_argument('--othercols', '-c4', type=str, default=False,
                     help='''Collapse these other columns (comma-sep list) into their own columns in output as well. To get column of line for min or max see --addcol.''')
 
+parser.add_argument('--otherOperation', '-O', type=str, default='list',
+                    help='''Perform these operations (Options: max, min, mean, median, sum, list, distinct) on other columns from --othercols. If one provided, applied to all. Else need to provide same number of functions in comma-separated list.''')
 
 parser.add_argument('--skip', '-s', type=str, default='#',
                     help='''Skip lines that start with given string. ''')
@@ -71,6 +73,16 @@ if args.addcol and len(fxns) == 1 and fxns[0] in ('min','max','list'):
 if args.othercols:
     othercols=True
     kols = [int(e)-1 for e in args.othercols.strip().split(",")]
+    nOtherKols = len(kols)
+
+    otherKolFxns = args.otherOperation.strip().split(",")
+    nOtherKolFxns = len(otherKolFxns)
+
+    assert nOtherKolFxns == 1 or nOtherKolFxns == nOtherKols
+    
+    if nOtherKolFxns == 1:
+        otherKolFxns = otherKolFxns*nOtherKols
+    
     DD = {}
     for col in kols:
         DD[col] = defaultdict(list)
@@ -139,9 +151,32 @@ for e in sorted(d.keys()):
         print((args.delimiter).join([ str(e), str(length) ] + ans + addcols ))                   
     elif othercols:
         othercols = []
-        for col in kols:
-            othercols.append( listfxn(DD[col][e]) )
+        #for col in kols:
+        #    othercols.append( listfxn(DD[col][e]) )
+        for oi in range(len(kols)):
+            col = kols[oi]
+            applyfxn = otherKolFxns[oi]
+            othercols.append( applyfxn(DD[col][e]) )
+        
         print((args.delimiter).join([ str(e), str(length) ] + ans + othercols ))                   
 
     else:    
         print((args.delimiter).join([ str(e), str(length) ] + ans))
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -54,6 +54,13 @@ parser.add_argument('--strings', '-str', action='store_true', default=False,
 
 args = parser.parse_args()
 
+
+## FXNS
+listfxn = lambda x: (",").join([str(e) for e in x])
+distinctfxn = lambda x: (",").join([str(e) for e in list(set(x))])
+
+
+## EXECUTE
 if args.strings:
     assert args.operation in ["list", "distinct"]
 
@@ -82,9 +89,12 @@ if args.othercols:
     
     if nOtherKolFxns == 1:
         otherKolFxnTerms = otherKolFxnTerms*nOtherKols
+    nOtherKolFxns = len(otherKolFxnTerms)
+    assert nOtherKolFxns == nOtherKols
+
 
     otherKolFxns = []
-    for e in otherKolFxns:
+    for e in otherKolFxnTerms:
         if e == 'sum':
             fxn = sum
         elif e == 'max':
@@ -99,7 +109,7 @@ if args.othercols:
             fxn = listfxn
         elif e == 'distinct':
             fxn = distinctfxn
-        ops.append(fxn)
+        otherKolFxns.append(fxn)
     
     DD = {}
     for col in kols:
@@ -110,8 +120,6 @@ if args.othercols:
 ##        addfxn = min
 
 ops = []
-listfxn = lambda x: (",").join([str(e) for e in x])
-distinctfxn = lambda x: (",").join([str(e) for e in list(set(x))])
 for e in fxns:
     if e == 'sum':
         fxn = sum

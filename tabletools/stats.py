@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+
+
 import sys
 import numpy as np
 ####import pandas
@@ -15,6 +17,9 @@ parser = argparse.ArgumentParser(description="""
 DESCRIPTION
     
     This is a copy of asm-stats.py -- but I added some other stuff.... 12/12/17
+	Latest update on: 2023-11-18
+	Other updates on: _
+
     Takes in list, computes stats including N50 and NG50 values.
 
     E = sum(contig_size^2)/Genome size. E-size is from the GAGE paper (Salzberg et al,2012, Genome Research). The E-size is designed to answer the question: If you choose a location (a base) in the reference genome at random, what is the expected size of the contig or scaffold containing that location?
@@ -51,6 +56,8 @@ parser.add_argument('-H', '--header', action='store_true', default=False,
                     help='''Optionally used with -t/--table. Prints out header line first.''')
 parser.add_argument('-A', '--addword', type=str, default=False,
                     help='''Print addword as first element (or after --filename) of output for either standard or table. e.g. add the filename.''')
+parser.add_argument('-d', '--digits', type=int, default=1,
+                    help='''For floats, round to these many digits. Default = 1.''')
 args = parser.parse_args()
 
 
@@ -58,6 +65,13 @@ args = parser.parse_args()
 ''' FUNCTIONS '''
 ##############################################################################
 
+def intify(x, digits=1):
+    if round(x) == x:
+        return int(x)
+    else:
+        return round(x, digits)
+
+    
 def NX(l, x=[25,50,75], G=False):
     """
     Returns NX for all x for a list of numbers l.
@@ -85,6 +99,7 @@ def NX(l, x=[25,50,75], G=False):
     else:
         return None, None
 
+
 def e_size(l,G=False):
     if G:
         total = G
@@ -92,6 +107,9 @@ def e_size(l,G=False):
         total = sum(l)
     return sum([e**2 for e in l])/float(total)
 
+
+
+    
 
 ##############################################################################
 ''' PROCESS ARGS '''
@@ -129,7 +147,7 @@ elif args.cmdline:
 l.sort()
 
 ## get X values for NX stats and sort
-x = [float(e) for e in args.x.split(",")]
+x = [intify(float(e), digits=args.digits) for e in args.x.split(",")]
 x.sort()
 
 ## get scale values and sort
@@ -138,32 +156,48 @@ if args.scale:
         G.sort()
 
 ## Get N 
-N = len(l)
+N = int(len(l))
+
 
 ## Get sum
-A = sum(l)
+A = intify(sum(l), digits=args.digits)
 
 ## Get max 
-MAX = max(l)
+MAX = intify(max(l), digits=args.digits)
 
 ## Get min 
-MIN = min(l)
+MIN = intify(min(l), digits=args.digits)
 
 ## Get mean 
-MEAN = np.mean(l)
+MEAN = intify(np.mean(l), digits=args.digits)
+
+## STDEV
+STDV = intify(np.std(l), digits=args.digits)
 
 ## Get median 
-MEDIAN = np.median(l)
+MEDIAN = intify(np.median(l), digits=args.digits)
 
 ## Get median 
-MAD = np.median( abs(np.array(l)-np.median(l)) )
+MAD = intify(np.median( abs(np.array(l)-np.median(l)) ), digits=args.digits)
 
 ## Get NX values
 nxvalues, lxvalues = NX(l,x,G=A)
 
 
 ## expected value given sum
-E = e_size(l,G=A)
+E = intify(e_size(l,G=A), digits=args.digits)
+
+
+
+## quantile
+#Qx=[10,25,50,75,90]
+Qx = [intify(float(e)) for e in args.probs.strip().split(',')]
+Qxh = ['Q'+str(e) for e in Qx] if args.header else []
+Q = [intify(e, digits=args.digits) for e in list(np.percentile(a=l, q=Qx))]
+
+
+
+
 
 ## Get NGX values
 if args.scale:
@@ -175,19 +209,11 @@ if args.scale:
         ## get expected sizes given genome size values
         egdict = {}
         for g in G:
-            egdict[g] = e_size(l,G=g)
+            egdict[g] = intify(e_size(l,G=g), digits=args.digits)
             
 ##    E = e_size(l,G=g)
 ##    print "E size (G=%d) = %d" % (g, E)
 
-
-## STDEV
-STDV = np.std(l)
-
-## quantile
-#Qx=[10,25,50,75,90]
-Qx = [float(e) for e in args.probs.strip().split(',')]
-Q = np.percentile(a=l, q=Qx)
 
 
 
@@ -195,31 +221,32 @@ Q = np.percentile(a=l, q=Qx)
 if not args.table:
     if args.addword:
         print(args.addword)
-    print("N:", N)
-    print("Sum:", A)
+    print("N :", N)
+    print("Sum :", A)
     print("Max :", MAX)
     print("Min :", MIN)
     print("Mean :", MEAN)
-    print("StDv:", STDV)
+    print("StDv :", STDV)
     print("Median :", MEDIAN)
-    print("Median Absolute Deviation from Median:", MAD)
+    #print("Median Absolute Deviation from Median :", MAD)
+    print("MAD :", MAD)
     for i in range(len(Qx)):
-            qxstr = 'Q'+str(Qx[i])+':'
+            qxstr = 'Q'+str(Qx[i])+' :'
             print(qxstr, Q[i])
 
     if nxvalues is not None:
             for e in x:
                 if nxvalues is not None:
-                        print("N%s\t%d" % (str(e), int(round(nxvalues[e]))))
+                        print("N%s :\t%d" % (str(e), int(round(nxvalues[e]))))
                 else:
-                        print("N%s\t%s" % (str(e), "-"))
+                        print("N%s :\t%s" % (str(e), "-"))
             for e in x:
                 if lxvalues is not None:
-                        print("L%s\t%d" % (str(e), int(round(lxvalues[e]))))
+                        print("L%s :\t%d" % (str(e), int(round(lxvalues[e]))))
                 else:
-                        print("L%s\t%d" % (str(e),"-"))
+                        print("L%s :\t%d" % (str(e),"-"))
         
-    print("E size (G=%d) = %f" % (A, E))
+    print("E-size :", E)
     if args.scale and nxvalues is not None:
             for g in G:
                 for e in x:
@@ -234,15 +261,16 @@ if not args.table:
 ## FOR NOW - NX AND E/EX STUFF DISABLED FOR THIS MODE - ALSO NEED TO ADD IN QUANTILES
 else:
     if args.header:
-        header = ["N","SUM","MAX","MIN","MEAN","STDV","MEDIAN", "MAD"] #+ ["N"+str(int(round(e))) for e in x] + ["L"+str(int(round(e))) for e in x] + ["E"] + ["NG"+str(int(round(e)))+"_"+str(int(round(g/1e6)))+"M" for e in x for g in G] + ["LG"+str(int(round(e)))+"_"+str(int(round(g/1e6)))+"M" for e in x for g in G] + ["E_"+str(int(round(g/1e6)))+"M" for g in G]
+        header = ["N","SUM","MAX","MIN","MEAN","STDV","MEDIAN", "MAD", "E-size"] +  Qxh #+ ["N"+str(int(round(e))) for e in x] + ["L"+str(int(round(e))) for e in x] + ["E"] + ["NG"+str(int(round(e)))+"_"+str(int(round(g/1e6)))+"M" for e in x for g in G] + ["LG"+str(int(round(e)))+"_"+str(int(round(g/1e6)))+"M" for e in x for g in G] + ["E_"+str(int(round(g/1e6)))+"M" for g in G]
         if args.addword:
             header = ["string"] + header
         print((",").join(header))
-    metrics = [N, A, MAX, MIN, MEAN, STDV, MEDIAN, MAD] #+ [nxvalues[e] for e in x] + [lxvalues[e] for e in x] + [E] + [gdict[g][0][e] for e in x for g in G] + [gdict[g][1][e] for e in x for g in G] + [egdict[g] for g in G]
+    metrics = [N, A, MAX, MIN, MEAN, STDV, MEDIAN, MAD] + [E] + list(Q) #+ [nxvalues[e] for e in x] + [lxvalues[e] for e in x] + [E] + [gdict[g][0][e] for e in x for g in G] + [gdict[g][1][e] for e in x for g in G] + [egdict[g] for g in G]
     if args.addword:
-        print((",").join([args.addword] + [str(int(round(e))) for e in metrics]))
+        #print((",").join([args.addword] + [str(int(round(e))) for e in metrics]))
+        print((",").join([args.addword] + [str(e) for e in metrics]))
     else:
-        print((",").join([str(round(e,3)) for e in metrics]))
+        print((",").join([str(e) for e in metrics]))
 
 
 

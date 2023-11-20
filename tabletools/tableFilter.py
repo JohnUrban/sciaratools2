@@ -13,9 +13,13 @@ def parse_args():
         Given table,
             keep only 1 line for each element in name column 
             that has the highest score in score column.
+            
+            
 
         Use case:
-        BLASTP output on gene set, keep entry with highest bit score.
+        - BLASTP output on gene set, keep entry with highest bit score.
+        - BED interval with highest (or lowest) end coordinate per chromosome.
+        
 
         """, formatter_class= argparse.RawTextHelpFormatter)
 
@@ -33,6 +37,9 @@ def parse_args():
 
     parser.add_argument('-d', '--delim', type=str, default='\t',
                         help='''Delimiter. Default = tab.''')
+
+    parser.add_argument('-L', '--lowest', action='store_true', default=False,
+                        help='''Filter for lowest value instead of highest.''')
 
     args = parser.parse_args()
     return args
@@ -54,7 +61,7 @@ def tableFilter_step01(tables):
     return tables, opentable, closetable
 
 
-def tableFilter_step02(tables, delim, score_col, name_col, opentable, closetable):
+def tableFilter_step02(tables, delim, score_col, name_col, opentable, closetable, lowest=False):
     ''' tables is a list of filenames for tabular-like files'''
     lines = {}
     scores = {}
@@ -66,7 +73,10 @@ def tableFilter_step02(tables, delim, score_col, name_col, opentable, closetable
             score = float(line[score_col])
             order.append(line[name_col])
             try:
-                if score > scores[line[name_col]]:
+                if score > scores[line[name_col]] and not lowest:
+                    scores[line[name_col]] = score
+                    lines[line[name_col]] = line
+                elif score < scores[line[name_col]] and lowest:
                     scores[line[name_col]] = score
                     lines[line[name_col]] = line
             except:
@@ -88,7 +98,7 @@ def tableFilter_step03(lines, order, delim):
             ## However, this can cause it to fail silently in unanticipated scenarios as well.
             pass
 
-def tableFilterPipeline(tables, delim, score_col, name_col):
+def tableFilterPipeline(tables, delim, score_col, name_col, lowest):
     ''' tables is a list of filenames for tabular-like files'''
     ## Step 1
     tables, opentable, closetable = tableFilter_step01( tables = tables )
@@ -99,7 +109,8 @@ def tableFilterPipeline(tables, delim, score_col, name_col):
                                                 score_col   = score_col,
                                                 name_col    = name_col,
                                                 opentable   = opentable,
-                                                closetable  = closetable)
+                                                closetable  = closetable,
+                                                lowest      = lowest)
     ## Step 3
     tableFilter_step03(lines, order, delim)
 
@@ -119,7 +130,8 @@ def main():
     tableFilterPipeline(tables      = args.table,
                         delim       = args.delim,
                         score_col   = score_col,
-                        name_col    = name_col)
+                        name_col    = name_col,
+                        lowest      = args.lowest)
 
 
     

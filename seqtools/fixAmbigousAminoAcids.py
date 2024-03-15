@@ -34,8 +34,11 @@ DESCRIPTION
 
 
     How to quickly check your FASTA for non-canonical and ambiguous letters...
-    grep -i -E 'OUBZXJ' ${FASTA} | grep -v ">" | less
-    grep -v ">" ${FASTA} | grep -c -i -E 'OUBZXJ'
+    grep -i -E '[OUBZXJ]' ${FASTA} | grep -v ">" | less
+    grep -v ">" ${FASTA} | grep -c -i -E '[OUBZXJ]'
+    OR
+    grep -i -E 'O|U|B|Z|X|J' ${FASTA} | grep -v ">" | less
+    grep -v ">" ${FASTA} | grep -c -i -E 'O|U|B|Z|X|J'
 
 
 

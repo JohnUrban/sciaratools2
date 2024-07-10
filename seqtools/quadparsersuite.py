@@ -17,6 +17,7 @@ import sys
 import string
 import argparse
 
+
 parser = argparse.ArgumentParser(description="""
 
 DESCRIPTION
@@ -262,7 +263,8 @@ if not args.fasta and not args.fastq:
         sys.exit('\nWhen using stdin, need to specify --fasta (-a) or --fastq (-q)\n')
     else:
         test = open(args.inputFile, 'r')
-        filetypetest = test.next()[0]
+        ##filetypetest = test.next()[0] ## py2.7
+        filetypetest = test.readline()[0]  ## py3
         if filetypetest == '>':
             args.fasta = True
         elif filetypetest == '@':
@@ -286,7 +288,8 @@ if args.counts:
 intab=  'actguACTGU'
 outtab= 'tgacaTGACA'
 if args.regexrev is None:
-    transtab = string.maketrans(intab, outtab)
+    #transtab = string.maketrans(intab, outtab) #py2.7
+    transtab = str.maketrans(intab, outtab) # py3
     regexrev = args.regex.translate(transtab)
     #print regexrev
     ###regexrev = args.regex.translate(transtab)[-1::-1] ## need revcomp as default -- need to be able to do this to complex regexes though

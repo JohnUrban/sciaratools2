@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse
+import argparse, sys
 from Bio import SeqIO
 from collections import defaultdict
 from numpy.random import choice
@@ -150,6 +150,14 @@ Note however that both will globally affect all replacement choices.
 
 ''')
 
+parser.add_argument('--verbose', '-v', 
+                   action='store_true', default=False,
+                   help='''Write messages to stderr about changes.''')
+
+parser.add_argument('--verbose2', '-v2', 
+                   action='store_true', default=False,
+                   help='''Write even more messages to stderr about changes.''')
+
 args = parser.parse_args()
 
 
@@ -165,6 +173,10 @@ def probs(ltrs, freq):
     for b in ltrs:
         p.append( freq[b]/s )
     return p
+
+def stderr(msg):
+    if args.verbose:
+        print(msg, file=sys.stderr)
 
 
 
@@ -225,11 +237,13 @@ if args.remove:
         translate[char] = lambda : ''
 
 
+anticipated_ltrs = []
 if args.anticipate:
     rulepairs = args.anticipate.split(";")
     for rule in rulepairs:
         keylist, replacements = rule.split(":")
         keys = keylist.split(",")
+        anticipated_ltrs += keys
         replist = [e for e in replacements]
         for ltr in replist:
             try:
@@ -239,15 +253,34 @@ if args.anticipate:
         for key in keys:
             translate[key] = lambda : choice(replist, p = probs(replacements,freq))
 
-        
+
+total_seqs = 0
+total_seqs_safe = 0
+total_seqs_fixed = 0
+total_seqs_with_remove_chars = 0
+total_seqs_with_anticipated_alt_ltrs = 0
+total_seqs_with_unanticipated_alt_ltrs = 0
+alt_ltr_counts = defaultdict(int)
+
 for fa in SeqIO.parse(args.fasta, 'fasta'):
+    total_seqs += 1
+    unsafe = 0
+    hadremove = 0
+    hadantalt = 0
+    hadunantalt = 0
     seq = str(fa.seq)
+    seqname = str(fa.name)
     newseq = ''
     for ltr in seq:
         if ltr not in safe_ltrs:
+            unsafe += 1
+            alt_ltr_counts[ltr] += 1
+            hadremove += 1 if ltr in args.remove else 0
+            hadantalt += 1 if ltr in other_ltrs else 0
+            hadunantalt += 1 if ltr in anticipated_ltrs else 0
             try:
                 newltr = translate[ltr]()
-            except:
+            except:                
                 #default to treating unantipated letters as X
                 if not args.keep_unexpected:
                     newltr = translate['X']()
@@ -261,7 +294,43 @@ for fa in SeqIO.parse(args.fasta, 'fasta'):
         newseq = newseq.upper()
     elif args.lower:
         newseq = newseq.lower()
+
+    ## What happened?
+    if unsafe > 0:
+        total_seqs_fixed += 1
+        total_seqs_with_remove_chars +=1 if hadremove > 0 else 0
+        total_seqs_with_anticipated_alt_ltrs += 1 if hadantalt else 0
+        total_seqs_with_unanticipated_alt_ltrs += 1 if hadunantalt else 0     
+        outmsg = ('\t').join(str(e) for e in ["input-fixed", seqname, hadremove, hadantalt, hadunantalt])
+    else:
+        total_seqs_safe += 1
+        outmsg = ('\t').join(str(e) for e in ["input-safe", seqname, hadremove, hadantalt, hadunantalt])
+
+
+    ## STDOUT
     print(">"+fa.description)
     print(newseq)
+
+    ## STDERR
+    stderr(outmsg)
+            
+        
+
+## FINAL REPORT STDERR
+
+outd = dict(total_seqs=total_seqs,
+            total_seqs_safe=total_seqs_safe,
+            total_seqs_fixed=total_seqs_fixed,
+            total_seqs_with_remove_chars=total_seqs_with_remove_chars,
+            total_seqs_with_anticipated_alt_ltrs=total_seqs_with_anticipated_alt_ltrs,
+            total_seqs_with_unanticipated_alt_ltrs=total_seqs_with_unanticipated_alt_ltrs)
+
+for key in outd.keys():
+    outmsg = ('\t').join(str(e) for e in ["final-report", str(key), str(outd[key])])
+    stderr(outmsg)
+    
+for key in alt_ltr_counts.keys():
+    outmsg = ('\t').join(str(e) for e in ["final-report", str(key), str(alt_ltr_counts[key])])
+    stderr(outmsg)
         
         

@@ -114,7 +114,7 @@ parser.add_argument('--keep_unexpected', '-K',
                    help='''When unanticipated letter is encountered, keep it as is instead of converting it using the X rule. Default: False.''')
 
 parser.add_argument('--remove', '-r', 
-                   type=str, default=False,
+                   type=str, default="",
                    help='''Characters to remove when seen in protein sequence. For example, both * and . are seen in orthoDB protein sequences.
 Recommended: --remove "*." (quotes needed).
 Otherwise these characters will be treated as any other unanticipated character and replaced by the X rule.''')

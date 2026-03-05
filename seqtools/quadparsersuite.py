@@ -17,7 +17,7 @@ import sys
 import string
 import argparse
 
-
+# '([gG]{3,}\w{1,7}){3,}[gG]{3,}' and its complement '([cC]{3,}\w{1,7}){3,}[cC]{3,}'
 parser = argparse.ArgumentParser(description="""
 
 DESCRIPTION
@@ -72,7 +72,7 @@ DESCRIPTION
         Nucleic Acids Res. 33: 2908-2916.
     Search only the given sequence ("forward strand") by using --noreverse.
     
-    The defualt regex is '([gG]{3,}\w{1,7}){3,}[gG]{3,}' and its complement '([cC]{3,}\w{1,7}){3,}[cC]{3,}'
+    The defualt regex is '([gG]{3,}\\w{1,7}){3,}[gG]{3,}' and its complement '([cC]{3,}\\w{1,7}){3,}[cC]{3,}'
     produce the same output as in http://www.quadruplex.org/?view=quadbaseDownload
     and/or https://nonb-abcc.ncifcrf.gov/apps/site/default
     
@@ -159,24 +159,24 @@ DESCRIPTION
     New i-motif paper (featuring Julian Hupper) gives a regex for i-motifs:
     https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5605235/
     motif = C5(N1-19C5)3
-    written as regex = [Cc]{5,}(\w{1,19}[Cc]{5,}){3,}
+    written as regex = [Cc]{5,}(\\w{1,19}[Cc]{5,}){3,}
 
     NOTE Sep 2018:
     Be careful with the default reverse regex.
     It gives the complement, not the reverse complement.
 
-    """, formatter_class= argparse.RawTextHelpFormatter)
+    """, formatter_class= argparse.RawTextHelpFormatter) #[Cc]{5,}(\w{1,19}[Cc]{5,}){3,}
 
 
 parser.add_argument('--regex', '-r',
                    type= str,
                    help='''Regex to be searched in the fasta input.
 Matches to this regex will have + strand. This string passed to python
-re.compile(). The default regex is '([gG]{3,}\w{1,7}){3,}[gG]{3,}' which searches
+re.compile(). The default regex is '([gG]{3,}\\w{1,7}){3,}[gG]{3,}' which searches
 for G-quadruplexes.
                                    
                    ''',
-                   default=False)
+                   default=False) # ([gG]{3,}\w{1,7}){3,}[gG]{3,}
 
 parser.add_argument('--regexrev', '-R',
                    type= str,
@@ -193,21 +193,21 @@ For example, instead of "-r CACGAG", do "-r 'CACGAG|CTCGTG' ". ''', default=None
 parser.add_argument('--minG', '-g',
                    type= int,
                    help='''minG is the minimum number of Gs in a G tract.
-A G4 is typically defined as: ([gG]{3,}\w{1,7}){3,}[gG]{3,}
+A G4 is typically defined as: ([gG]{3,}\\w{1,7}){3,}[gG]{3,}
 As such, the default minG value is 3.
                    ''',
-                   default=3)
+                   default=3) #([gG]{3,}\w{1,7}){3,}[gG]{3,}
 
 parser.add_argument('--maxN', '-n',
                    type= int,
                    help='''maxN is the maximum number of number of Ns in loops between G tracts.
-A G4 is typically defined as: ([gG]{3,}\w{1,7}){3,}[gG]{3,}
+A G4 is typically defined as: ([gG]{3,}\\w{1,7}){3,}[gG]{3,}
 As such, the default maxN value is 7.
-Recently people have also often used maxN=15 -- i.e. ([gG]{3,}\w{1,15}){3,}[gG]{3,}
+Recently people have also often used maxN=15 -- i.e. ([gG]{3,}\\w{1,15}){3,}[gG]{3,}
 Note, though, as G4 motifs get longer, they become less likely to actually form G4s,
 especially in the context of dsDNA.
                    ''',
-                   default=7)
+                   default=7) # ([gG]{3,}\w{1,7}){3,}[gG]{3,} ; ([gG]{3,}\w{1,15}){3,}[gG]{3,}
 
 parser.add_argument('--inputFile', '-i',
                    type= str,
@@ -275,8 +275,8 @@ if not args.fasta and not args.fastq:
         test.close()
 ## create regex
 if not args.regex:
-    ##default='([gG]{3,}\w{1,7}){3,}[gG]{3,}'
-    args.regex = '([gG]{' + str(args.minG) + ',}\w{1,' + str(args.maxN) + '}){3,}[gG]{' + str(args.minG) + ',}'
+    ##default='([gG]{3,}\w{1,7}){3,}[gG]{3,}' # ',}\w{1,'
+    args.regex = '([gG]{' + str(args.minG) + ',}\\w{1,' + str(args.maxN) + '}){3,}[gG]{' + str(args.minG) + ',}'
 
 
 if args.reportseq:

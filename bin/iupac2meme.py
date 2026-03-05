@@ -1,0 +1,1 @@
+../seqtools/iupac2meme.py

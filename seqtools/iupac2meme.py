@@ -59,7 +59,8 @@ def main():
     print(f"letter-probability matrix: alength= 4 w= {len(s)}")
     for ch in s:
         a, c, g, t = IUPAC_TO_PROBS[ch]
-        print(f"{a:.6g}\t{c:.6g}\t{g:.6g}\t{t:.6g}\t# {ch}")
+        #print(f"{a:.6g}\t{c:.6g}\t{g:.6g}\t{t:.6g}\t# {ch}")
+        print(f"{a:.6g}\t{c:.6g}\t{g:.6g}\t{t:.6g}")
 
 if __name__ == "__main__":
     main()

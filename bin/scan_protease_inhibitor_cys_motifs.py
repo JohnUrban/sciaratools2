@@ -1,0 +1,1 @@
+../seqtools/scan_protease_inhibitor_cys_motifs.py
